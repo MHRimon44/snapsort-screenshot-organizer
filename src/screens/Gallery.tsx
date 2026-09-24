@@ -1,3 +1,84 @@
-import {PAGE_PADDING} from '../theme/layout';
-import React,{useState} from 'react';import {FlatList,Text,TextInput,View} from 'react-native';import {Empty,Header,Tile} from '../components/UI';import type {LibraryController} from '../hooks/useLibrary';import type {Screenshot} from '../types';import {useTheme} from '../theme';
-export function Gallery({vm,open,search=false}:{vm:LibraryController;open:(item:Screenshot)=>void;search?:boolean}){const {colors:c}=useTheme();const [query,setQuery]=useState('');const q=query.trim().toLowerCase();const filtered=search&&q?vm.items.filter(x=>(x.name+' '+x.text+' '+x.category).toLowerCase().includes(q)):vm.items;return <View style={{flex:1}}><Header title={search?'Search':'Library'} subtitle={search?'Search recognized words, filenames and categories offline.':`${vm.items.length} screenshots · ${vm.permission==='partial'?'Selected photos only':'On your device'}`}/><View style={{flex:1,paddingHorizontal:PAGE_PADDING}}>{search?<TextInput placeholder="Try a name, word or category" placeholderTextColor={c.muted} value={query} onChangeText={setQuery} autoCapitalize="none" style={{backgroundColor:c.surface,borderColor:c.line,borderWidth:1,borderRadius:13,color:c.ink,paddingHorizontal:14,fontSize:13,marginBottom:10}}/>:null}<FlatList data={filtered} numColumns={2} columnWrapperStyle={{justifyContent:'space-between'}} keyExtractor={x=>x.id} renderItem={({item})=><Tile item={item} onPress={()=>open(item)} onFavorite={()=>void vm.favorite(item)}/>} ListEmptyComponent={<Empty icon="image-search" title={search&&q?'No matches':'No screenshots yet'} body={search&&q?'Try another word or scan pending images.':'Choose screenshots or allow access in settings.'}/>} contentContainerStyle={{paddingBottom:24}}/></View></View>}
+import { PAGE_PADDING } from '../theme/layout';
+import React, { useState } from 'react';
+import { FlatList, Text, TextInput, View } from 'react-native';
+import { Empty, Header, Tile } from '../components/UI';
+import type { LibraryController } from '../hooks/useLibrary';
+import type { Screenshot } from '../types';
+import { useTheme } from '../theme';
+export function Gallery({
+  vm,
+  open,
+  search = false,
+}: {
+  vm: LibraryController;
+  open: (item: Screenshot) => void;
+  search?: boolean;
+}) {
+  const { colors: c } = useTheme();
+  const [query, setQuery] = useState('');
+  const q = query.trim().toLowerCase();
+  const filtered =
+    search && q
+      ? vm.items.filter(x =>
+          (x.name + ' ' + x.text + ' ' + x.category).toLowerCase().includes(q),
+        )
+      : vm.items;
+  return (
+    <View style={{ flex: 1 }}>
+      <Header
+        title={search ? 'Search' : 'Library'}
+        subtitle={
+          search
+            ? 'Search recognized words, filenames and categories offline.'
+            : `${vm.items.length} screenshots · ${vm.permission === 'partial' ? 'Selected photos only' : 'On your device'}`
+        }
+      />
+      <View style={{ flex: 1, paddingHorizontal: PAGE_PADDING }}>
+        {search ? (
+          <TextInput
+            placeholder="Try a name, word or category"
+            placeholderTextColor={c.muted}
+            value={query}
+            onChangeText={setQuery}
+            autoCapitalize="none"
+            style={{
+              backgroundColor: c.surface,
+              borderColor: c.line,
+              borderWidth: 1,
+              borderRadius: 13,
+              color: c.ink,
+              paddingHorizontal: 14,
+              fontSize: 13,
+              marginBottom: 10,
+            }}
+          />
+        ) : null}
+        <FlatList
+          data={filtered}
+          numColumns={2}
+          columnWrapperStyle={{ justifyContent: 'space-between' }}
+          keyExtractor={x => x.id}
+          renderItem={({ item }) => (
+            <Tile
+              item={item}
+              onPress={() => open(item)}
+              onFavorite={() => void vm.favorite(item)}
+            />
+          )}
+          ListEmptyComponent={
+            <Empty
+              icon="image-search"
+              title={search && q ? 'No matches' : 'No screenshots yet'}
+              body={
+                search && q
+                  ? 'Try another word or scan pending images.'
+                  : 'Choose screenshots or allow access in settings.'
+              }
+            />
+          }
+          contentContainerStyle={{ paddingBottom: 24 }}
+        />
+      </View>
+    </View>
+  );
+}

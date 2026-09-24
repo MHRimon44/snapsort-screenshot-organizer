@@ -1,9 +1,217 @@
-import {PAGE_PADDING} from '../theme/layout';
+import { PAGE_PADDING } from '../theme/layout';
 import React from 'react';
-import {Alert,Pressable,ScrollView,Text,View} from 'react-native';
+import { Alert, Pressable, ScrollView, Text, View } from 'react-native';
 import DeviceInfo from 'react-native-device-info';
-import {AdsConsent} from 'react-native-google-mobile-ads';
-import {Action,Card,Header} from '../components/UI';
-import type {LibraryController} from '../hooks/useLibrary';
-import {native} from '../services/native';import {useTheme} from '../theme';
-export function Settings({vm}:{vm:LibraryController}){const {colors:c,mode,setMode}=useTheme();async function task(fn:()=>Promise<unknown>,success:string){try{const result=await fn();if(result!==false){await vm.refresh();Alert.alert('Done',success)}}catch(e){Alert.alert('Unable to complete',String(e))}}return <View style={{flex:1}}><Header title="Settings" subtitle="Your preferences and local data."/><ScrollView contentContainerStyle={{padding:PAGE_PADDING,paddingBottom:24}}><Card><Text style={{color:c.ink,fontWeight:'800',fontSize:14,marginBottom:8}}>Appearance</Text><View style={{flexDirection:'row',gap:8}}>{(['system','light','dark'] as const).map(value=><Pressable key={value} accessibilityRole="button" accessibilityState={{selected:mode===value}} onPress={()=>setMode(value)} style={{backgroundColor:mode===value?c.accent:c.pale,paddingHorizontal:13,paddingVertical:8,borderRadius:10}}><Text style={{color:mode===value?c.onAccent:c.accent,fontWeight:'700'}}>{value[0].toUpperCase()+value.slice(1)}</Text></Pressable>)}</View></Card><Card><Text style={{color:c.ink,fontWeight:'800',fontSize:14,marginBottom:8}}>Photo access · {vm.permission}</Text><Text style={{color:c.muted,marginBottom:8}}>Access is requested when you first open the app. You can also choose individual photos.</Text><Action icon="add-photo-alternate" label="Choose photos" onPress={()=>void vm.pick()} secondary/><View style={{height:8}}/><Action icon="photo-library" label="Change photo access" onPress={()=>void vm.request()} secondary/></Card><Card><Text style={{color:c.ink,fontWeight:'800',fontSize:14,marginBottom:8}}>Backup app data</Text><Text style={{color:c.muted,marginBottom:8}}>Exports contain recognized text and photo references in readable JSON. Images are not included. Store backups privately.</Text><Action icon="ios-share" label="Export data" onPress={()=>void task(native.exportData,'Backup exported to your chosen location.')} secondary/><View style={{height:8}}/><Action icon="file-open" label="Import data" onPress={()=>Alert.alert('Import backup?','Only images accessible on this phone can appear.',[{text:'Cancel',style:'cancel'},{text:'Import',onPress:()=>{void task(native.importData,'Matching data imported.')}}])} secondary/></Card><Card><Text style={{color:c.ink,fontWeight:'800',fontSize:14,marginBottom:8}}>Advertising</Text><Text style={{color:c.muted,marginBottom:8}}>Home may show a Google ad. Ads need internet and Google may process device and ad data. Your screenshots and recognized text are not sent to the ad SDK.</Text><Action icon="privacy-tip" label="Ad privacy choices" secondary onPress={()=>{void AdsConsent.showPrivacyOptionsForm().catch(()=>Alert.alert('Privacy options unavailable','No privacy form is required or available on this device right now.'))}}/></Card><Card><Text style={{color:c.ink,fontWeight:'800',fontSize:14,marginBottom:8}}>Privacy</Text><Text style={{color:c.muted,marginBottom:8}}>OCR and duplicate checks run on your device. Clearing the local index does not delete photos.</Text><Action icon="delete-sweep" label="Clear OCR index" secondary onPress={()=>Alert.alert('Clear local index?','Favorites and categories stay. OCR and hashes will be removed.',[{text:'Cancel',style:'cancel'},{text:'Clear',style:'destructive',onPress:()=>{void task(native.clearIndex,'OCR index cleared.')}}])}/></Card><Text style={{color:c.muted,textAlign:'center'}}>SnapSort {DeviceInfo.getVersion()} · build {DeviceInfo.getBuildNumber()}</Text></ScrollView></View>}
+import { AdsConsent } from 'react-native-google-mobile-ads';
+import { Action, Card, Header } from '../components/UI';
+import type { LibraryController } from '../hooks/useLibrary';
+import { native } from '../services/native';
+import { useTheme } from '../theme';
+export function Settings({ vm }: { vm: LibraryController }) {
+  const { colors: c, mode, setMode } = useTheme();
+  async function task(fn: () => Promise<unknown>, success: string) {
+    try {
+      const result = await fn();
+      if (result !== false) {
+        await vm.refresh();
+        Alert.alert('Done', success);
+      }
+    } catch (e) {
+      Alert.alert('Unable to complete', String(e));
+    }
+  }
+  return (
+    <View style={{ flex: 1 }}>
+      <Header title="Settings" subtitle="Your preferences and local data." />
+      <ScrollView
+        contentContainerStyle={{ padding: PAGE_PADDING, paddingBottom: 24 }}
+      >
+        <Card>
+          <Text
+            style={{
+              color: c.ink,
+              fontWeight: '800',
+              fontSize: 14,
+              marginBottom: 8,
+            }}
+          >
+            Appearance
+          </Text>
+          <View style={{ flexDirection: 'row', gap: 8 }}>
+            {(['system', 'light', 'dark'] as const).map(value => (
+              <Pressable
+                key={value}
+                accessibilityRole="button"
+                accessibilityState={{ selected: mode === value }}
+                onPress={() => setMode(value)}
+                style={{
+                  backgroundColor: mode === value ? c.accent : c.pale,
+                  paddingHorizontal: 13,
+                  paddingVertical: 8,
+                  borderRadius: 10,
+                }}
+              >
+                <Text
+                  style={{
+                    color: mode === value ? c.onAccent : c.accent,
+                    fontWeight: '700',
+                  }}
+                >
+                  {value[0].toUpperCase() + value.slice(1)}
+                </Text>
+              </Pressable>
+            ))}
+          </View>
+        </Card>
+        <Card>
+          <Text
+            style={{
+              color: c.ink,
+              fontWeight: '800',
+              fontSize: 14,
+              marginBottom: 8,
+            }}
+          >
+            Photo access · {vm.permission}
+          </Text>
+          <Text style={{ color: c.muted, marginBottom: 8 }}>
+            Access is requested when you first open the app. You can also choose
+            individual photos.
+          </Text>
+          <Action
+            icon="add-photo-alternate"
+            label="Choose photos"
+            onPress={() => void vm.pick()}
+            secondary
+          />
+          <View style={{ height: 8 }} />
+          <Action
+            icon="photo-library"
+            label="Change photo access"
+            onPress={() => void vm.request()}
+            secondary
+          />
+        </Card>
+        <Card>
+          <Text
+            style={{
+              color: c.ink,
+              fontWeight: '800',
+              fontSize: 14,
+              marginBottom: 8,
+            }}
+          >
+            Backup app data
+          </Text>
+          <Text style={{ color: c.muted, marginBottom: 8 }}>
+            Exports contain recognized text and photo references in readable
+            JSON. Images are not included. Store backups privately.
+          </Text>
+          <Action
+            icon="ios-share"
+            label="Export data"
+            onPress={() =>
+              void task(
+                native.exportData,
+                'Backup exported to your chosen location.',
+              )
+            }
+            secondary
+          />
+          <View style={{ height: 8 }} />
+          <Action
+            icon="file-open"
+            label="Import data"
+            onPress={() =>
+              Alert.alert(
+                'Import backup?',
+                'Only images accessible on this phone can appear.',
+                [
+                  { text: 'Cancel', style: 'cancel' },
+                  {
+                    text: 'Import',
+                    onPress: () => {
+                      void task(native.importData, 'Matching data imported.');
+                    },
+                  },
+                ],
+              )
+            }
+            secondary
+          />
+        </Card>
+        <Card>
+          <Text
+            style={{
+              color: c.ink,
+              fontWeight: '800',
+              fontSize: 14,
+              marginBottom: 8,
+            }}
+          >
+            Advertising
+          </Text>
+          <Text style={{ color: c.muted, marginBottom: 8 }}>
+            Home may show a Google ad. Ads need internet and Google may process
+            device and ad data. Your screenshots and recognized text are not
+            sent to the ad SDK.
+          </Text>
+          <Action
+            icon="privacy-tip"
+            label="Ad privacy choices"
+            secondary
+            onPress={() => {
+              void AdsConsent.showPrivacyOptionsForm().catch(() =>
+                Alert.alert(
+                  'Privacy options unavailable',
+                  'No privacy form is required or available on this device right now.',
+                ),
+              );
+            }}
+          />
+        </Card>
+        <Card>
+          <Text
+            style={{
+              color: c.ink,
+              fontWeight: '800',
+              fontSize: 14,
+              marginBottom: 8,
+            }}
+          >
+            Privacy
+          </Text>
+          <Text style={{ color: c.muted, marginBottom: 8 }}>
+            OCR and duplicate checks run on your device. Clearing the local
+            index does not delete photos.
+          </Text>
+          <Action
+            icon="delete-sweep"
+            label="Clear OCR index"
+            secondary
+            onPress={() =>
+              Alert.alert(
+                'Clear local index?',
+                'Favorites and categories stay. OCR and hashes will be removed.',
+                [
+                  { text: 'Cancel', style: 'cancel' },
+                  {
+                    text: 'Clear',
+                    style: 'destructive',
+                    onPress: () => {
+                      void task(native.clearIndex, 'OCR index cleared.');
+                    },
+                  },
+                ],
+              )
+            }
+          />
+        </Card>
+        <Text style={{ color: c.muted, textAlign: 'center' }}>
+          SnapSort {DeviceInfo.getVersion()} · build{' '}
+          {DeviceInfo.getBuildNumber()}
+        </Text>
+      </ScrollView>
+    </View>
+  );
+}

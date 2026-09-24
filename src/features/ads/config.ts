@@ -1,4 +1,4 @@
-import {TestIds} from 'react-native-google-mobile-ads';
+import { TestIds } from 'react-native-google-mobile-ads';
 
 // Test traffic must never use a production ad unit.
 export const HOME_BANNER_ID = __DEV__
