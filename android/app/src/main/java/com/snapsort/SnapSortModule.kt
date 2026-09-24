@@ -11,6 +11,7 @@ import android.database.sqlite.SQLiteDatabase
 import android.database.sqlite.SQLiteOpenHelper
 import android.net.Uri
 import android.os.Build
+import android.provider.DocumentsContract
 import android.provider.MediaStore
 import com.facebook.react.bridge.*
 import com.facebook.react.modules.core.PermissionAwareActivity
@@ -41,7 +42,7 @@ class SnapSortModule(private val context:ReactApplicationContext):ReactContextBa
   @ReactMethod fun getTheme(p:Promise){p.resolve(context.getSharedPreferences("snapsort",0).getString("theme","system"))}
   @ReactMethod fun setTheme(mode:String,p:Promise){if(mode !in listOf("system","light","dark")){p.reject("THEME","Invalid mode");return};context.getSharedPreferences("snapsort",0).edit().putString("theme",mode).apply();p.resolve(null)}
   @ReactMethod fun requestPermission(p:Promise){context.getSharedPreferences("snapsort",0).edit().putBoolean("permission_prompted",true).apply();val activity=context.currentActivity as? PermissionAwareActivity?:run{p.reject("ACTIVITY","No activity");return};val perms=if(Build.VERSION.SDK_INT>=34)arrayOf(Manifest.permission.READ_MEDIA_IMAGES,Manifest.permission.READ_MEDIA_VISUAL_USER_SELECTED) else if(Build.VERSION.SDK_INT>=33)arrayOf(Manifest.permission.READ_MEDIA_IMAGES) else arrayOf(Manifest.permission.READ_EXTERNAL_STORAGE);activity.requestPermissions(perms,4105,PermissionListener{_,_,_->p.resolve(grants());true})}
-  @ReactMethod fun pick(p:Promise){val activity=context.currentActivity?:run{p.reject("ACTIVITY","No activity");return};if(pendingPick!=null){p.reject("BUSY","Picker already open");return};pendingPick=p;try{val intent=Intent("android.intent.action.GET_CONTENT").apply{type="image/*";putExtra(Intent.EXTRA_ALLOW_MULTIPLE,true);addCategory(Intent.CATEGORY_OPENABLE)};activity.startActivityForResult(Intent.createChooser(intent,"Choose screenshots"),reqPick)}catch(e:Exception){pendingPick=null;p.reject("PICK",e)}}
+  @ReactMethod fun pick(p:Promise){val activity=context.currentActivity?:run{p.reject("ACTIVITY","No activity");return};if(pendingPick!=null){p.reject("BUSY","Picker already open");return};pendingPick=p;try{val intent=Intent(Intent.ACTION_OPEN_DOCUMENT).apply{type="image/*";putExtra(Intent.EXTRA_ALLOW_MULTIPLE,true);addCategory(Intent.CATEGORY_OPENABLE);addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION or Intent.FLAG_GRANT_PERSISTABLE_URI_PERMISSION)};activity.startActivityForResult(Intent.createChooser(intent,"Choose screenshots"),reqPick)}catch(e:Exception){pendingPick=null;p.reject("PICK",e)}}
   private fun valid(uri:Uri):Boolean = context.contentResolver.getType(uri)?.startsWith("image/")==true
   @ReactMethod fun list(p:Promise)=work(p){
     val out=Arguments.createArray();
@@ -90,12 +91,147 @@ class SnapSortModule(private val context:ReactApplicationContext):ReactContextBa
     }
     finally{scaled.recycle()}
   }
-  @ReactMethod fun delete(uri:String,p:Promise){val activity=context.currentActivity?:run{p.reject("ACTIVITY","No activity");return};if(pendingDelete!=null){p.reject("BUSY","Delete already active");return};if(Build.VERSION.SDK_INT<30){p.reject("UNSUPPORTED","Requires Android 11 or later");return};try{val parsed=Uri.parse(uri);if(parsed.authority!="media"){p.reject("UNSUPPORTED","Selected documents cannot be deleted by MediaStore. Delete them in the gallery.");return};pendingDelete=p;val request=MediaStore.createDeleteRequest(context.contentResolver,listOf(parsed));activity.startIntentSenderForResult(request.intentSender,reqDelete,null,0,0,0)}catch(e:Exception){pendingDelete=null;p.reject("DELETE",e)}}
+  private fun documentCanDelete(uri: Uri): Boolean {
+    if (!DocumentsContract.isDocumentUri(context, uri)) return false
+    return try {
+      context.contentResolver.query(uri, arrayOf(DocumentsContract.Document.COLUMN_FLAGS), null, null, null)?.use { cursor ->
+        cursor.moveToFirst() && (cursor.getInt(0) and DocumentsContract.Document.FLAG_SUPPORTS_DELETE) != 0
+      } ?: false
+    } catch (_: Exception) { false }
+  }
+
+  private fun mediaImageForDelete(source: Uri): Uri? {
+    if (source.scheme != "content") return null
+    val candidate = if (source.authority == MediaStore.AUTHORITY) source else
+      try { MediaStore.getMediaUri(context, source) } catch (_: Exception) { null }
+    val segments = candidate?.pathSegments ?: return null
+    // Only a specific image row is valid. Photo-picker proxies and collection URIs are rejected.
+    if (candidate.authority != MediaStore.AUTHORITY || segments.size != 4 ||
+      segments[1] != "images" || segments[2] != "media") return null
+    val id = segments[3].toLongOrNull() ?: return null
+    if (id < 0) return null
+    return MediaStore.Images.Media.getContentUri(segments[0], id)
+  }
+
+  @ReactMethod fun delete(uri:String,p:Promise){
+    val activity=context.currentActivity?:run{p.reject("ACTIVITY","No activity");return}
+    if(pendingDelete!=null){p.reject("BUSY","Delete already active");return}
+    val source=Uri.parse(uri)
+    if(documentCanDelete(source)){
+      pendingDelete=p
+      io.execute{
+        try {
+          val deleted=DocumentsContract.deleteDocument(context.contentResolver,source)
+          if(deleted) store.writableDatabase.delete("metadata","uri=?",arrayOf(uri))
+          context.runOnUiQueueThread{pendingDelete=null;p.resolve(deleted)}
+        }catch(e:Exception){context.runOnUiQueueThread{pendingDelete=null;p.reject("DELETE",e)}}
+      }
+      return
+    }
+    if(Build.VERSION.SDK_INT<30){p.reject("UNSUPPORTED","Requires Android 11 or later");return}
+    val target=mediaImageForDelete(source)?:run{
+      p.reject("UNSUPPORTED","This photo cannot be deleted here. For a previously chosen photo, choose it again in Settings; cloud photos must be deleted in their gallery.");return
+    }
+    try{
+      val request=MediaStore.createDeleteRequest(context.contentResolver,listOf(target))
+      pendingDelete=p
+      activity.startIntentSenderForResult(request.intentSender,reqDelete,null,0,0,0)
+    }catch(e:IllegalArgumentException){pendingDelete=null;p.reject("DELETE","Android cannot delete this picker item by its media ID. Choose it again in Settings, or delete it in your gallery.")}
+    catch(e:Exception){pendingDelete=null;p.reject("DELETE",e)}
+  }
   @ReactMethod fun exportData(p:Promise){val activity=context.currentActivity?:run{p.reject("ACTIVITY","No activity");return};if(pendingExport!=null){p.reject("BUSY","Export in progress");return};pendingExport=p;try{activity.startActivityForResult(Intent(Intent.ACTION_CREATE_DOCUMENT).apply{addCategory(Intent.CATEGORY_OPENABLE);type="application/json";putExtra(Intent.EXTRA_TITLE,"snapsort-backup.json")},reqExport)}catch(e:Exception){pendingExport=null;p.reject("EXPORT",e)}}
   @ReactMethod fun importData(p:Promise){val activity=context.currentActivity?:run{p.reject("ACTIVITY","No activity");return};if(pendingImport!=null){p.reject("BUSY","Import in progress");return};pendingImport=p;try{activity.startActivityForResult(Intent(Intent.ACTION_OPEN_DOCUMENT).apply{addCategory(Intent.CATEGORY_OPENABLE);type="application/json"},reqImport)}catch(e:Exception){pendingImport=null;p.reject("IMPORT",e)}}
   @ReactMethod fun clearIndex(p:Promise)=work(p){store.writableDatabase.execSQL("UPDATE metadata SET text='',hash='',visual_hash='',status='pending'");null}
   private fun backup():String{val records=JSONArray();store.readableDatabase.rawQuery("SELECT uri,favorite,category,text,hash,status,modified,size,visual_hash FROM metadata",null).use{c->while(c.moveToNext()){records.put(JSONObject().apply{put("uri",c.getString(0));put("favorite",c.getInt(1));put("category",c.getString(2));put("text",c.getString(3));put("hash",c.getString(4));put("status",c.getString(5));put("modified",c.getLong(6));put("size",c.getLong(7));put("visualHash",c.getString(8))})}};return JSONObject().put("format","snapsort-1").put("records",records).toString()}
   private fun restore(json:String){val root=JSONObject(json);require(root.getString("format")=="snapsort-1"){"Unsupported backup"};val records=root.getJSONArray("records");require(records.length()<=100000){"Backup too large"};val db=store.writableDatabase;db.beginTransaction();try{for(i in 0 until records.length()){val o=records.getJSONObject(i);val uri=o.getString("uri");require(uri.startsWith("content://")){"Invalid image URI"};db.execSQL("INSERT OR REPLACE INTO metadata(uri,favorite,category,text,hash,status,modified,size,visual_hash) VALUES(?,?,?,?,?,?,?,?,?)",arrayOf(uri,if(o.optInt("favorite")==1)1 else 0,o.optString("category"),o.optString("text"),o.optString("hash"),o.optString("status","pending"),o.optLong("modified"),o.optLong("size"),o.optString("visualHash")))};db.setTransactionSuccessful()}finally{db.endTransaction()}}
-  override fun onActivityResult(activity:Activity,requestCode:Int,resultCode:Int,data:Intent?){when(requestCode){reqDelete->{val p=pendingDelete;pendingDelete=null;if(resultCode==Activity.RESULT_OK){p?.resolve(true)}else p?.resolve(false)};reqPick->{val p=pendingPick;pendingPick=null;if(resultCode!=Activity.RESULT_OK){p?.resolve(0);return};work(p?:return){val uris=mutableListOf<Uri>();data?.data?.let{uris.add(it)};data?.clipData?.let{clip->for(i in 0 until clip.itemCount)uris.add(clip.getItemAt(i).uri)};var count=0;for(uri in uris){try{context.contentResolver.takePersistableUriPermission(uri,Intent.FLAG_GRANT_READ_URI_PERMISSION)}catch(_:Exception){};try{if(valid(uri)){ensure(uri.toString());count++}}catch(_:Exception){}};count}};reqExport->{val p=pendingExport;pendingExport=null;if(resultCode!=Activity.RESULT_OK||data?.data==null){p?.resolve(false);return};work(p?:return){context.contentResolver.openOutputStream(data.data!!,"wt").use{requireNotNull(it).write(backup().toByteArray(Charsets.UTF_8))};true}};reqImport->{val p=pendingImport;pendingImport=null;if(resultCode!=Activity.RESULT_OK||data?.data==null){p?.resolve(false);return};work(p?:return){val bytes=context.contentResolver.openInputStream(data.data!!).use{requireNotNull(it).readBytes()};require(bytes.size<25_000_000){"Backup too large"};restore(String(bytes,Charsets.UTF_8));true}}}}
-  override fun onNewIntent(intent:Intent){}
+override fun onActivityResult(
+  activity: Activity,
+  requestCode: Int,
+  resultCode: Int,
+  data: Intent?
+) {
+  when (requestCode) {
+    reqDelete -> {
+      val p = pendingDelete
+      pendingDelete = null
+      p?.resolve(resultCode == Activity.RESULT_OK)
+    }
+
+    reqPick -> {
+      val p = pendingPick
+      pendingPick = null
+      if (resultCode != Activity.RESULT_OK) {
+        p?.resolve(0)
+        return
+      }
+
+      val uris = mutableListOf<Uri>()
+      data?.data?.let { uris.add(it) }
+      data?.clipData?.let { clip ->
+        for (i in 0 until clip.itemCount) {
+          uris.add(clip.getItemAt(i).uri)
+        }
+      }
+      val grantedFlags = (data?.flags ?: 0) and
+        (Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION)
+
+      work(p ?: return) {
+        var count = 0
+        for (uri in uris) {
+          try {
+            context.contentResolver.takePersistableUriPermission(uri, grantedFlags)
+          } catch (_: Exception) {
+            // Continue if this provider does not offer a persistable grant.
+          }
+
+          try {
+            if (valid(uri)) {
+              ensure(uri.toString())
+              count++
+            }
+          } catch (_: Exception) {
+            // Skip images that can no longer be accessed.
+          }
+        }
+        count
+      }
+    }
+
+    reqExport -> {
+      val p = pendingExport
+      pendingExport = null
+      val uri = data?.data
+      if (resultCode != Activity.RESULT_OK || uri == null) {
+        p?.resolve(false)
+        return
+      }
+
+      work(p ?: return) {
+        context.contentResolver.openOutputStream(uri, "wt").use {
+          requireNotNull(it).write(backup().toByteArray(Charsets.UTF_8))
+        }
+        true
+      }
+    }
+
+    reqImport -> {
+      val p = pendingImport
+      pendingImport = null
+      val uri = data?.data
+      if (resultCode != Activity.RESULT_OK || uri == null) {
+        p?.resolve(false)
+        return
+      }
+
+      work(p ?: return) {
+        val bytes = context.contentResolver.openInputStream(uri).use {
+          requireNotNull(it).readBytes()
+        }
+        require(bytes.size < 25_000_000) { "Backup too large" }
+        restore(String(bytes, Charsets.UTF_8))
+        true
+      }
+    }
+  }
+}  override fun onNewIntent(intent:Intent){}
 }
