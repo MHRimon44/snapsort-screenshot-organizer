@@ -208,8 +208,7 @@ export function Settings({ vm }: { vm: LibraryController }) {
           />
         </Card>
         <Text style={{ color: c.muted, textAlign: 'center' }}>
-          SnapSort {DeviceInfo.getVersion()} · build{' '}
-          {DeviceInfo.getBuildNumber()}
+          SnapSort {DeviceInfo.getVersion()}
         </Text>
       </ScrollView>
     </View>
