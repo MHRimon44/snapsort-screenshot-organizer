@@ -1,19 +1,44 @@
-# SnapSort UI, dark mode, and duplicate detection patch
+# SnapSort
 
-Copy `src/` and `android/app/src/main/java/com/snapsort/SnapSortModule.kt` into your existing SnapSort project, replacing the matching files. Do not replace your existing package.json, Gradle files, AndroidManifest.xml, App.tsx, or MainApplication.kt. Your current Android setup already builds.
+SnapSort is an offline Android app that helps you find and organize screenshots. It reads text on your phone, lets you search that text, and suggests duplicates for review. Your images and recognized text stay on the device.
 
-The app requests library permission once on first launch; Android may show Full / Selected / Deny depending on its version. A denial is not repeatedly requested on every launch. Use Settings to change access. If permission was previously denied while testing, Android may suppress repeat dialogs; open system App Info → Permissions → Photos and videos to change it. Existing installations preserve their SQLite metadata and migrate the database to add a visual hash.
+## Run locally
 
-A background duplicate check now runs after permission is granted or photos are selected. Cleanup also triggers a check. Exact matching uses SHA-256 file bytes; visually similar suggestions use a downsampled difference hash and aspect ratio. Similarity is not proof of redundancy. The user chooses individual images and Android confirms every deletion. OCR remains a separate on-demand scan.
-
-Appearance can follow the device or be set to Light or Dark in Settings. The color palette follows the indigo SnapSort icon.
-
-From the project root:
+You need Node.js 20.19.4 or newer, JDK 17, Android Studio with the Android SDK, and an Android 11 or newer emulator or phone. From the project folder:
 
 ```bash
-yarn tsc --noEmit
-# Keep Metro running in another terminal:
-yarn android
+corepack yarn install
+corepack yarn tsc --noEmit
+corepack yarn start:reset
 ```
 
-The Kotlin module changed, so a native rebuild is required. No new npm package is needed. Test permission grant/denial, two exact copies, a recompressed copy, cancellation of a deletion, the appearance choices, and an app restart. Large galleries take time to hash; Cleanup shows a pending count. This patch has not been compiled on an Android SDK in this workspace.
+Keep Metro running. Open a second terminal in the same folder:
+
+```bash
+corepack yarn android
+```
+
+If you have already set up `yarn` to use Corepack, you can use `yarn install`, `yarn start:reset`, and `yarn android` instead. For a phone connected by USB, enable USB debugging, check `adb devices`, then run `adb reverse tcp:8081 tcp:8081` before launching the app. An emulator normally connects automatically.
+
+## How the app works
+
+1. On first launch, choose full photo access, selected photos, or deny access. You can change your choice later in Settings.
+2. **Home** shows your accessible screenshots and recent items. Tap **Scan text** to recognize words on the device.
+3. **Library** lets you browse screenshots, open one, favorite it, and set its category.
+4. **Search** finds screenshots by recognized words, filename, or category. Unscanned images need a text scan before their contents are searchable.
+5. **Cleanup** checks images for exact copies and visually similar candidates. Review each suggestion before deleting; Android asks you to confirm every deletion.
+6. **Settings** offers System, Light, and Dark appearance, photo access controls, and local data export/import. The backup is readable JSON containing recognized text and metadata, not image files; store it privately.
+
+## Project layout
+
+| Path                                     | Purpose                                                                         |
+| ---------------------------------------- | ------------------------------------------------------------------------------- |
+| `src/app`                                | App shell, tabs, theme selection                                                |
+| `src/screens`                            | Home, Library, Search, Detail, Cleanup, Settings                                |
+| `src/components`                         | Reusable buttons, cards, and screenshot tiles                                   |
+| `src/hooks`                              | Permission, library, and scan state                                             |
+| `src/services`                           | Native bridge and category/duplicate rules                                      |
+| `src/theme`, `src/types`                 | Colors and shared TypeScript types                                              |
+| `android/app/src/main/java/com/snapsort` | Android photo access, local SQLite storage, OCR, hashing, and deletion requests |
+
+SnapSort has no account or app server. Similarity is a suggestion, so always check images before deleting them. On-device OCR currently uses the bundled Latin text model.
