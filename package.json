@@ -1,0 +1,52 @@
+{
+  "name": "SnapSort",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "android": "react-native run-android",
+    "ios": "react-native run-ios",
+    "start": "react-native start",
+    "start:reset": "react-native start --reset-cache",
+    "test": "jest",
+    "adb": "adb reverse tcp:8081 tcp:8081",
+    "clean": "rm -rf node_modules && rm -rf package-lock.json",
+    "clean:android": "cd android && ./gradlew clean && cd ..",
+    "clean:ios": "rm -rf ios/Pods && rm -rf ios/Podfile.lock",
+    "build:android": "cd android && ./gradlew assembleRelease",
+    "release:android": "cd android && ./gradlew bundleRelease",
+    "detox-build:ios": "detox build --configuration ios.sim.debug",
+    "detox-test:ios": "detox test --configuration ios.sim.debug",
+    "detox-build:android": "detox build --configuration android.emu.debug",
+    "detox-test:android": "detox test --configuration android.emu.debug",
+    "lint": "eslint . --ignore-pattern coverage/",
+    "lint:fix": "eslint --fix ./src/**/*.{ts,tsx}",
+    "format": "prettier --check ./src/**/*.{ts,tsx}",
+    "format:fix": "prettier --write ./src/**/*.{ts,tsx}",
+    "rename": "react-native-rename",
+    "pod": "cd ios && pod install && cd .."
+  },
+  "dependencies": {
+    "@react-native-vector-icons/material-icons": "^12.4.0",
+    "react": "19.1.1",
+    "react-native": "0.82.0",
+    "react-native-device-info": "^15.0.1",
+    "react-native-safe-area-context": "^5.6.0"
+  },
+  "devDependencies": {
+    "@react-native-community/cli": "^20.0.0",
+    "@react-native-community/cli-platform-android": "^20.0.0",
+    "@react-native-community/cli-platform-ios": "^20.0.0",
+    "@react-native/babel-preset": "0.82.0",
+    "@react-native/metro-config": "0.82.0",
+    "@react-native/typescript-config": "^0.82.0",
+    "@types/jest": "^30.0.0",
+    "@types/react": "^19.1.0",
+    "@types/react-test-renderer": "^19.3.0",
+    "react-test-renderer": "19.1.1",
+    "typescript": "^5.8.3"
+  },
+  "engines": {
+    "node": ">=20.19.4"
+  },
+  "packageManager": "yarn@4.18.0+sha512.fcb8716fe7cd0eece141ffc18b92193a9df9204c1ba83189c288835223fc0bbe64af473bab0d5e9927a7daeb5caf2bb07eb2787cc9338ca040ea125f2a1f2f7e"
+}
